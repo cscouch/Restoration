@@ -1,0 +1,5 @@
+Dataset_Name,Organization,Topside_Data_Recorder,In-water_Observer,Island,Sub-Island_Region,Survey_Type,GPS_Unit,GPS_Start,GPS_End,Tow_Dive_Number,Date,Time,Damage_Score,Notes
+Oahu_HurricaneX_Assessment,NOAA,Ms. Marvel,Psylock,Oahu,Waikiki,Snorkel Tow,A,12:25:56,12:29:40,1,1/1/2024,12:26:30,0,
+Oahu_HurricaneX_Assessment,NOAA,Ms. Marvel,Psylock,Oahu,Waikiki,Snorkel Tow,A,12:25:56,12:29:40,1,1/1/2024,12:26:52,1,
+Oahu_HurricaneX_Assessment,NOAA,Ms. Marvel,Psylock,Oahu,Waikiki,Snorkel Tow,A,12:25:56,12:29:40,1,1/1/2024,12:27:22,3,
+Oahu_HurricaneX_Assessment,NOAA,Ms. Marvel,Psylock,Oahu,Waikiki,Snorkel Tow,A,12:25:56,12:29:40,1,1/1/2024,12:27:48,4,
