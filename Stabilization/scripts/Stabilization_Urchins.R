@@ -9,7 +9,7 @@ library(ggridges)
 
 
 #LOAD DATA
-urchin<-read.csv("Stablization_Urchins_T0-6monthPO.csv")
+urchin<-read.csv("data/Stablization_Urchins_T0-6monthPO.csv")
 # urchin<- urchin %>% 
 #   rename(SPCODE=Species) %>%
 #   #mutate(Survey_Period = recode(Survey_Period, T0_Post_Installation = 'T0', Baseline = 'Baseline', T1_6months =  'T1 (6months)'))%>%
@@ -47,6 +47,19 @@ col.tot<-as.data.frame(urchin.new %>%
                          summarise(n = n()))
 
 View(col.tot)
+
+
+#Save file for Nyssa to use for Bayasian analysis- remove reference site and post outplant data
+for.nyssa<-as.data.frame(urchin.new %>% 
+                           filter(Treatment!="Reference")   %>%
+                           filter(Survey_Period!="T1_6mo_postoutplant")   %>%
+                           group_by(Survey_Period, Treatment,Plot_ID) %>% 
+                           summarise(urchin_abun = n()))
+
+#save file
+write.csv(for.nyssa,file="data for Nyssa/Urchins_byPlot_forNyssa.csv",row.names = FALSE)
+
+
 
 #Plotting Urchin abundance for first 2 time points
 
