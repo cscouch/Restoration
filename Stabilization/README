@@ -1,0 +1,12 @@
+#These data include wild colony data collected in the first 6 months of the rubble stablization project. Data are summarized to the plot level to set up for Bayesian analyses
+#This readme file provides a description of the column names and data prep that took place before data colony level data were summarized to the plot level.
+
+####Data Prep####
+#removed the near by reference site data (we are dealing with some data issues that need to get resolved before working with the data). 
+#Coral outplants were added to the "boulder" and "mesh" plots, but post-outplant survey data aren't included
+#Surveys were conducted in a 1m2 area for mesh and control plots, we are still calculating area for the boulder piles so only abundance data are provided for now. Assume area is consistent across time for each plot
+#We didn't conduct surveys at the control plots after plots were installed so we are using the "Baseline" data for the "T0_Post-Installation" survey period
+####Colony Definitions####
+#Survey Period: Baseline = conducted in each plot before any active treatment was installed, T0_Post-Installation = conducted immediately after (several days-1week) active treatments were installed, T1_6mo_preoutplant = conducted 6 months after treatments were installed, but before outplants were added
+#Treatment: Control = rubble control with a center pin in the experimental area with no active treatments, Boulder = 1 x 1 x ~0.5m pile of large reef rubble cemented into a pyramid, Mesh = 2x2m PVC coated mesh cemented and pinned (only central 1m2) inlcuded in surveys
+#colony_abun = abundance of wild colonies (>= 0.5cm) in survey/plot area. 
