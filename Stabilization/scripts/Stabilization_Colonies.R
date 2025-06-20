@@ -8,6 +8,7 @@ lu<-read.csv("T:/Benthic/Data/Lookup Tables/Genus_lookup.csv")
 library(dplyr)
 library(ggplot2)
 library(ggridges)
+library(tidyr)
 
 
 #LOAD DATA
@@ -110,13 +111,48 @@ ggplot(col.tot,aes(Treatment,n))+
 
 
 ###By Genus
-col.gen<-as.data.frame(colony3 %>% 
+
+col.tot<-as.data.frame(colony.new %>% 
+                         filter(Treatment!="Reference")   %>%                      
+                         group_by(Survey_Period, Treatment,Plot_ID) %>% 
+                         summarise(n = n()))
+
+col.gen<-as.data.frame(colony.new %>% 
+                         filter(Treatment!="Reference")   %>%  
+                         filter(Survey_Period!="T1_6mo_postoutplant")   %>%  
                          group_by(Survey_Period, Treatment,Plot_ID,GENUS_CODE) %>% 
                          summarise(n = n()))
 
 View(col.gen)
 
-col.gen<-col.gen %>% filter(Treatment!="Reference")
+# Reshape the data to wide format: one column per survey period- filter just boulder piles
+col.gen.wide <- col.gen %>%
+  filter(Treatment =="Boulder")   %>%  
+  filter(Survey_Period!="Baseline")   %>%  
+  mutate(Genus = recode(GENUS_CODE, MOSP = 'Montipora', POCS = 'Pocillopora', POSP =  'Porites'))%>%
+  pivot_wider(names_from = Survey_Period, values_from = n)
+
+# Step 3: Calculate percent change between the two survey periods
+perc.change <- col.gen.wide %>%
+  mutate(
+    Percent_Change = 100 * ((`T1_6mo_preoutplant` - `T0_Post_Installation`) / `T0_Post_Installation`))%>%
+    filter(Genus %in% c("Montipora","Pocillopora","Porites"))
+  
+#Plot percent change for top 3 taxa 
+ggplot(perc.change,aes(Genus,Percent_Change))+
+  geom_boxplot(fill = "grey")+
+  labs(x = "Genus", y = "% Change in Abundance")+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.title = element_blank(),
+        legend.position = "none") 
+
 
 col.gen$Treatment <- factor(col.gen$Treatment, levels = c("Control", "Mesh", "Boulder"))
 
@@ -124,12 +160,19 @@ ggplot(col.gen,aes(Survey_Period,n, fill=GENUS_CODE))+
   geom_bar(position="stack", stat="identity")+
   facet_wrap(~Treatment)+
 labs(x = "Treatment", y = "Colony Abundance")+
-  #theme_minimal() +
-  theme(
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    legend.title = element_blank()  )
-  
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.title = element_blank(),
+        legend.position = "none") 
+
+#Calculate % change in colony abun by genus. 
+
 
 #Ridge plot of colony size
 size.mean<-as.data.frame(colony.new %>% 
