@@ -11,6 +11,7 @@ library(ggridges)
 library(tidyr)
 
 
+
 #LOAD DATA
 colony<-read.csv("data/Stablization_Colony_T0-6monthPO.csv")
 colony<- colony %>%
@@ -183,25 +184,46 @@ size.mean<-as.data.frame(colony.new %>%
                         summarise(mean = mean(Size),max=max(Size)))
 size.mean
 
-colony.new %>% 
-  filter(Survey_Period =="Baseline" & Treatment %in% c("Control","Reference")) %>%
-  mutate(Treatment = recode(Treatment, Control = 'Experimental Site', Reference = 'Reference Site'))%>%
-ggplot(., aes(x = Size, y = Treatment, fill = Treatment)) +
-  geom_density_ridges_gradient(scale = 2, gradient_lwd = .5,
-                               color = "black") +
-  geom_point(shape=18,size=4,data=size.mean,aes(x=mean,y=Treatment,fill="black"))+
-  #geom_vline(aes(xintercept=mean,group="Treatment"),data=size.mean)+
-  scale_fill_brewer(palette="Set2") +
-  labs(x = "Colony Size (cm)", y = "Treatment") +
+p1<-colony.new %>% 
+  filter(Survey_Period == "Baseline" & Treatment %in% c("Control", "Reference")) %>%
+  mutate(Treatment = recode(Treatment,
+                            Control = 'Experimental Site',
+                            Reference = 'Reference Site'),
+         Treatment = factor(Treatment, levels = c("Reference Site","Experimental Site"))) %>%
+  ggplot(aes(x = Size, y = Treatment, fill = Treatment)) +
+  geom_density_ridges_gradient(
+    scale = 2,
+    gradient_lwd = 0.5,
+    color = "black",
+    rel_min_height = 0
+  ) +
+  geom_point(shape = 18, size = 4,
+             data = size.mean,
+             aes(x = mean, y = Treatment),
+             inherit.aes = FALSE, fill = "black") +
+  scale_fill_manual(values = c("Reference Site" = "#ff7f0e","Experimental Site" = "#1f77b4")) +  
+  labs(x = "Colony Size (cm)", y="") +
   theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank(),
-        axis.text = element_text(size = 12),
-        axis.title = element_text(size = 14, face = "bold"),
-        legend.title = element_blank(),
-        legend.position = "none") 
+  theme(
+    axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.text = element_text(size = 14,face="bold"),
+    axis.title = element_text(size = 16, face = "bold"),
+    legend.title = element_blank(),
+    legend.position = "none",
+    plot.margin = margin(t = 5, r = 5, b = 5, l = 5),
+    coord_cartesian(clip="off")
+  )
 
 
+# Use a graphics device to capture both ggplot + grid overlay and add vertical line between facets
+jpeg("Colony size ridge plot.jpg", width = 8.5, height = 6, units = "in", res = 300)
+
+# Draw the ggplot
+print(p1)
+
+# Close the graphics device
+dev.off()

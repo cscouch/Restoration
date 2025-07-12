@@ -1,0 +1,9 @@
+Treatment,IvC,Time,Density,SE
+Boulder,I,B,3.5,0.6
+Boulder,C,B,2.2,0.2
+Boulder,I,A,15,0.9
+Boulder,C,A,2.1,0.3
+Mesh,I,B,1.9,0.8
+Mesh,C,B,2.8,0.3
+Mesh,I,A,4.1,0.9
+Mesh,C,A,2.1,0.3

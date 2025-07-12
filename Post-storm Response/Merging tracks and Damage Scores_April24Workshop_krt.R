@@ -3,19 +3,21 @@ rm(list = ls())
 dir = Sys.info()[7]
 setwd(paste0("C:/Users/", dir, "/Documents/GitHub/Restoration/Post-storm Response/AprilWorkshop"))
 
-library(dplyr)
-library(sp)
-library(sf)
-library(raster)
-library(ncf) # for gcdist()
-# library(ggsn)
-library(ggspatial)
-library(ggrepel)
-library(lubridate)
-library(hms)
-library(tidyr)
+# library(dplyr)
+# library(sp)
+# library(sf)
+# library(raster)
+# library(ncf) # for gcdist()
+# library(ggspatial)
+# library(ggrepel)
+# library(lubridate)
+# library(hms)
+# library(tidyr)
 
-select = dplyr::select
+library(tidyverse)
+library(lubridate)
+library(sf)
+library(data.table)
 
 
 #Read in islands shapefile
@@ -53,8 +55,8 @@ tracks$Date <- as.Date(tracks$Date)
 dmg$Time <- as.POSIXct(dmg$Time, format = "%H:%M:%S")
 
 dmg <- dmg %>%
-  separate(Time, into = c("d", "Time"), 
-           sep = " ", convert = TRUE, extra = "merge") %>%
+  rename(Group = Organization) %>%
+  separate(Time, into = c("d", "Time"), sep = " ", convert = TRUE, extra = "merge") %>%
   select(-c(Notes)) 
 
 # Convert time strings to POSIXct datetime objects
@@ -125,29 +127,62 @@ dmg <- dmg %>%
   arrange(Time) %>%
   mutate(End_Time = if_else(row_number() == n(), GPS_End, End_Time))
 
-# Create intervals
-dmg$Interval <- interval(dmg$Time, dmg$End_Time)
+# # Create intervals
+# dmg$Interval <- interval(dmg$Time, dmg$End_Time)
 
-# dmg <- subset(dmg,Organization=="Group 1")
+# Set as data.table
+setDT(tracks)
+setDT(dmg)
 
-# Initialize the Damage_Score column in track
-tracks$Damage_Score <- NA
+# Assign start and end columns explicitly (use existing Time column in place of missing Start_Time)
+dmg[, `:=`(start = Time, end = End_Time)]
+tracks[, `:=`(start = Time, end = Time)]  # treat each point as a 0-length interval
 
-# Iterate over each row in track to assign Damage_Score - this may take a while to run
-for (i in 1:nrow(tracks)) {
-  
-  for (j in 1:nrow(dmg)) {
-    
-    if (tracks$Time[i] %within% dmg$Interval[j]) {
-      
-      tracks$Damage_Score[i] <- dmg$Damage_Score[j]
-      
-      break  # Stop checking once the correct interval is found
-      
-    }
-    
-  }
-}
+# Remove NAs in dmg time intervals
+dmg <- dmg[!is.na(start) & !is.na(end)]
+
+dmg <- dmg[!(start > end)]
+
+
+# Ensure Group is a factor in both tables
+dmg[, Group := as.factor(Group)]
+tracks[, Group := as.factor(Group)]
+
+# Set keys
+setkey(dmg, start, end)
+setkey(tracks, start, end)
+
+# Grouped foverlaps by Group
+tracks_matched <- rbindlist(lapply(unique(tracks$Group), function(g) {
+  foverlaps(
+    tracks[Group == g],
+    dmg[Group == g, .(start, end, Group, Damage_Score)],
+    type = "within"
+  )
+}))
+
+# Optional: Keep original structure
+tracks <- tracks_matched
+
+
+# # Initialize the Damage_Score column in track
+# tracks$Damage_Score <- NA
+# 
+# # Iterate over each row in track to assign Damage_Score - this may take a while to run
+# for (i in 1:nrow(tracks)) {
+#   
+#   for (j in 1:nrow(dmg)) {
+#     
+#     if (tracks$Time[i] %within% dmg$Interval[j]) {
+#       
+#       tracks$Damage_Score[i] <- dmg$Damage_Score[j]
+#       
+#       break  # Stop checking once the correct interval is found
+#       
+#     }
+#     
+#   }
+# }
 
 tracks$Damage_Score = as.numeric(tracks$Damage_Score)
 tracks$Damage_Score[is.na(tracks$Damage_Score)] <- NA
