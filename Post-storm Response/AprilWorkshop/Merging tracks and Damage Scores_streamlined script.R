@@ -87,6 +87,9 @@ tracks_matched <- rbindlist(lapply(group_list, function(g) {
   )
 }))
 
+tracks_matched <- tracks_matched %>% 
+  drop_na(Damage_Score)
+
 # Perform interval join
 tracks <- tracks_matched[, .(Latitude, Longitude, Organization, Date, Time, Damage_Score)]
 
@@ -95,7 +98,7 @@ tracks$Damage_Score <- tracks_matched$Damage_Score
 
 
 tracks$Damage_Score = as.numeric(tracks$Damage_Score)
-tracks$Damage_Score[is.na(tracks$Damage_Score)] <- NA
+#tracks$Damage_Score[is.na(tracks$Damage_Score)] <- NA
 
 
 ##### Plot tracks 3 different ways.

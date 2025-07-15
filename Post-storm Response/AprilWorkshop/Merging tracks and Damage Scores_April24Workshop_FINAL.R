@@ -3,19 +3,16 @@ rm(list = ls())
 dir = Sys.info()[7]
 setwd(paste0("C:/Users/", dir, "/Documents/GitHub/Restoration/Post-storm Response/AprilWorkshop"))
 
-library(dplyr)
-library(sp)
-library(sf)
-library(raster)
-library(ncf) # for gcdist()
-# library(ggsn)
-library(ggspatial)
-library(ggrepel)
+library(tidyverse)
 library(lubridate)
-library(hms)
-library(tidyr)
+library(sf)
+library(data.table)
+library(viridis) 
 
-select = dplyr::select
+
+
+# Load shapefile
+islands <- st_read("islands.shp")
 
 #
 dmg <- read.csv("DMGScores-OAHU-041724.csv") %>% filter(Damage_Score != "D")
@@ -125,34 +122,118 @@ dmg <- dmg %>%
   arrange(Time) %>%
   mutate(End_Time = if_else(row_number() == n(), GPS_End, End_Time))
 
-# Create intervals
-dmg$Interval <- interval(dmg$Time, dmg$End_Time)
+#Trying foverlaps
+# Use data.table for fast interval matching
+setDT(dmg)
+setDT(tracks)
 
-# dmg <- subset(dmg,Organization=="Group 1")
+#Change Group to Organization in tracks
+tracks <- tracks %>%
+  rename(Organization = Group)
 
-# Initialize the Damage_Score column in track
-tracks$Damage_Score <- NA
+# Assign foverlaps columns
+dmg[, `:=`(start = Time, end = End_Time)]
+tracks[, `:=`(start = Time, end = Time)]
 
-# Iterate over each row in track to assign Damage_Score
-for (i in 1:nrow(tracks)) {
-  
-  for (j in 1:nrow(dmg)) {
-    
-    if (tracks$Time[i] %within% dmg$Interval[j]) {
-      
-      tracks$Damage_Score[i] <- dmg$Damage_Score[j]
-      
-      break  # Stop checking once the correct interval is found
-      
-    }
-    
-  }
-}
+# Drop NA intervals
+dmg <- dmg[!is.na(start) & !is.na(end)]
+dmg <- dmg[!(start > end)]
+
+# Set keys and do overlap join
+setkey(dmg, start, end)
+setkey(tracks, start, end)
+
+#convert group to factor
+dmg$Organization <- factor(dmg$Organization)  
+tracks$Organization <- factor(tracks$Organization)
+
+#Join by Organization
+group_list <- unique(tracks$Organization)
+
+tracks_matched <- rbindlist(lapply(group_list, function(g) {
+  foverlaps(
+    tracks[Organization == g],
+    dmg[Organization == g, .(start = Time, end = End_Time, Organization, Damage_Score)],
+    type = "within"
+  )
+}))
+
+tracks_matched <- tracks_matched %>% 
+  drop_na(Damage_Score)
+
+# Perform interval join
+tracks <- tracks_matched[, .(Latitude, Longitude, Organization, Date, Time, Damage_Score)]
+
+# Assign matched damage scores
+tracks$Damage_Score <- tracks_matched$Damage_Score
+
 
 tracks$Damage_Score = as.numeric(tracks$Damage_Score)
-tracks$Damage_Score[is.na(tracks$Damage_Score)] <- NA
 
-# View the updated track df
-ggplot(tracks, aes(Longitude, Latitude, fill = Damage_Score, color = Damage_Score)) + 
-  geom_point(shape = 21, alpha = 0.5) + 
-  facet_wrap(~Group, scales = "free")
+
+###Original Foreloop code
+# # Create intervals
+# dmg$Interval <- interval(dmg$Time, dmg$End_Time)
+# 
+# # dmg <- subset(dmg,Organization=="Group 1")
+# 
+# # Initialize the Damage_Score column in track
+# tracks$Damage_Score <- NA
+# 
+# # Iterate over each row in track to assign Damage_Score
+# for (i in 1:nrow(tracks)) {
+#   
+#   for (j in 1:nrow(dmg)) {
+#     
+#     if (tracks$Time[i] %within% dmg$Interval[j]) {
+#       
+#       tracks$Damage_Score[i] <- dmg$Damage_Score[j]
+#       
+#       break  # Stop checking once the correct interval is found
+#       
+#     }
+#     
+#   }
+# }
+# 
+# tracks$Damage_Score = as.numeric(tracks$Damage_Score)
+# tracks$Damage_Score[is.na(tracks$Damage_Score)] <- NA
+# 
+
+write.csv(tracks,"Damage_tracks_comb_Kiesi.csv")
+
+
+##### Plot tracks 3 different ways.
+
+# Without any Island shape files (the surveys were conducted across different spatial scales, so this view allows you to see the individual tracks for each group more clearly)
+ggplot(tracks, aes(Longitude, Latitude, color = Damage_Score)) + 
+  geom_point(shape = 21, size = 2, alpha = 0.6) + 
+  scale_color_viridis(option = "C", direction = -1, na.value = "grey90", name = "Damage Score") +
+  facet_wrap(~Organization, scales = "free") +
+  labs(title = "Survey Tracks by Organization", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold"))
+
+#Add island-level shape file and combine all groups together
+#Note, you will need to adjust the map extent (xlim and ylim) based on your survey area
+ggplot(islands) + 
+  geom_sf(fill = "grey90", color = "black") +
+  geom_point(data = tracks, aes(Longitude, Latitude, color = Damage_Score), 
+             shape = 21, size = 2, alpha = 0.6) + 
+  coord_sf(xlim = c(-157.94, -157.86), ylim = c(21.28, 21.33), expand = FALSE) +
+  scale_color_viridis(option = "C", direction = -1, na.value = "grey90", name = "Damage Score") +
+  labs(title = "All Tracks with Island Map", x = "Longitude", y = "Latitude") +
+  theme_minimal()
+
+#Add island-level shape file, but visualize each group in its own map. Note- group 4 is barely visible because they surveyed such a small area. 
+ggplot(islands) + 
+  geom_sf(fill = "grey90", color = "black") +
+  geom_point(data = tracks, aes(Longitude, Latitude, color = Damage_Score), 
+             shape = 21, size = 2, alpha = 0.6) + 
+  coord_sf(xlim = c(-157.94, -157.86), ylim = c(21.28, 21.33), expand = FALSE) +
+  scale_color_viridis(option = "C", direction = -1, na.value = "grey90", name = "Damage Score") +
+  facet_wrap(~Organization) +
+  labs(title = "Survey Tracks by Organization with Island Map", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold"))
+
