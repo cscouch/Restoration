@@ -11,10 +11,11 @@ library(viridis)
 
 
 
-# Load shapefile
+# Load data ---------------------------------------------------------------
+
+# Load island shapefile for plotting in R
 islands <- st_read("islands.shp")
 
-#
 dmg <- read.csv("DMGScores-OAHU-041724.csv") %>% filter(Damage_Score != "D")
 
 g1 <- read.csv("DMG-OAHU-GROUP1-041724.csv"); g1$Group = "Group1"
@@ -24,9 +25,11 @@ g4 <- read.csv("DMG-OAHU-GROUP4-041724.csv"); g4$Group = "Group4"
 
 tracks <- rbind(g1, g2, g3, g4); rm(g1, g2, g3, g4)
 
+
+# Data clean up and dealing with date/time formats ------------------------
+
 #Clean up track file and convert date time columns
 tracks <- tracks %>%
-  # select(Latitude, Longitude, time) %>%
   separate(time, into = c("Date", "Time2"), 
            sep = " ", convert = TRUE, extra = "merge") %>%
   mutate(date = ymd(Date),
@@ -38,13 +41,6 @@ tracks <- tracks %>%
 
 tracks$Date <- as.Date(tracks$Date)
 
-# #tracks$Date<-dplyr::filter(Date =="2024-04-17")
-# date.range <- interval(as.POSIXct("9:43:00"), 
-#                        as.POSIXct("11:31:42")) 
-# 
-# tracks <- tracks[tracks$Time %within% date.range,]
-# 
-# head(tracks)
 
 #Clean up damage file and convert date time columns
 dmg$Time <- as.POSIXct(dmg$Time, format = "%H:%M:%S")
@@ -77,26 +73,18 @@ tracks <- tracks %>%
   mutate(in_out = if_else(any(dmg$GPS_Start <= datetime & datetime <= dmg$GPS_End), "in", "out")) %>%
   select(-c(datetime)) 
 
-dmg %>% 
-  select(GPS_Start, GPS_End) %>% 
-  distinct()
-
+# Quick visual check- which time points are within the damge time  --------
 tracks %>% 
-  # filter(Group == "Group2") %>% 
   ggplot(aes(Longitude, Latitude, color = in_out)) + 
   geom_point()  + 
   facet_wrap(~Group, scales = "free")
 
-tracks %>% 
-  # filter(Group == "Group3") %>%
-  ggplot(aes(Longitude, Latitude, color = Time)) + 
-  geom_point()  + 
-  facet_grid(in_out~Group)
 
+# Trim tracks data and define start and end times for damage scores -------
+#Trim tracks to start and end 
 start_time <- min(dmg$Time)
 end_time <- max(dmg$Time)
 
-#Trim tracks to start and end 
 tracks <- tracks %>%
   filter(between(Time, start_time, end_time))
 
@@ -105,7 +93,8 @@ tracks <- tracks %>%
   filter(in_out != "out")
 
 # Determine the max time in the track dataset. This should be identical to max(dmg$Time)
-max_time_track <- max(tracks$Time)
+max(tracks$Time)
+max(dmg$Time)
 
 # Set end times to one second before the next damage score starts, except for the last damage score
 dmg <- dmg %>%
@@ -122,7 +111,12 @@ dmg <- dmg %>%
   arrange(Time) %>%
   mutate(End_Time = if_else(row_number() == n(), GPS_End, End_Time))
 
-#Trying foverlaps
+#Quick check of both data frames
+head(dmg)
+head(tracks)
+
+# Merge damage and tracks data --------------------------------------------
+
 # Use data.table for fast interval matching
 setDT(dmg)
 setDT(tracks)
@@ -137,6 +131,8 @@ tracks[, `:=`(start = Time, end = Time)]
 
 # Drop NA intervals
 dmg <- dmg[!is.na(start) & !is.na(end)]
+
+#Check to see if start time is > end, drop these rows of data
 dmg <- dmg[!(start > end)]
 
 # Set keys and do overlap join
@@ -165,45 +161,14 @@ tracks_matched <- tracks_matched %>%
 tracks <- tracks_matched[, .(Latitude, Longitude, Organization, Date, Time, Damage_Score)]
 
 # Assign matched damage scores
-tracks$Damage_Score <- tracks_matched$Damage_Score
-
-
 tracks$Damage_Score = as.numeric(tracks$Damage_Score)
 
-
-###Original Foreloop code
-# # Create intervals
-# dmg$Interval <- interval(dmg$Time, dmg$End_Time)
-# 
-# # dmg <- subset(dmg,Organization=="Group 1")
-# 
-# # Initialize the Damage_Score column in track
-# tracks$Damage_Score <- NA
-# 
-# # Iterate over each row in track to assign Damage_Score
-# for (i in 1:nrow(tracks)) {
-#   
-#   for (j in 1:nrow(dmg)) {
-#     
-#     if (tracks$Time[i] %within% dmg$Interval[j]) {
-#       
-#       tracks$Damage_Score[i] <- dmg$Damage_Score[j]
-#       
-#       break  # Stop checking once the correct interval is found
-#       
-#     }
-#     
-#   }
-# }
-# 
-# tracks$Damage_Score = as.numeric(tracks$Damage_Score)
-# tracks$Damage_Score[is.na(tracks$Damage_Score)] <- NA
-# 
-
+#Export combined data as csv file
 write.csv(tracks,"Damage_tracks_comb_Kiesi.csv")
 
 
-##### Plot tracks 3 different ways.
+
+# Plot tracks 3 ways ------------------------------------------------------
 
 # Without any Island shape files (the surveys were conducted across different spatial scales, so this view allows you to see the individual tracks for each group more clearly)
 ggplot(tracks, aes(Longitude, Latitude, color = Damage_Score)) + 
